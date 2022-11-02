@@ -72,6 +72,8 @@ class Websocket:
     def __init__(self, sock):
         self.sock = sock
         self.open = True
+        self.poll = select.poll()
+        self.poll.register(self.sock, select.POLLIN)
 
     def __enter__(self):
         return self
@@ -89,6 +91,9 @@ class Websocket:
         """
 
         # Frame header
+        event = self.poll.poll(0)
+        if not event:
+            raise NoDataException
         two_bytes = self.sock.read(2)
 
         if not two_bytes:
@@ -186,7 +191,8 @@ class Websocket:
             except NoDataException:
                 return ''
             except ValueError:
-                LOGGER.debug("Failed to read frame. Socket dead.")
+                if __debug__:
+                    LOGGER.debug("Failed to read frame. Socket dead.")
                 self._close()
                 raise ConnectionClosed()
 
@@ -236,7 +242,8 @@ class Websocket:
             return
 
         buf = struct.pack('!H', code) + reason.encode('utf-8')
-
+        if __debug__:
+            LOGGER.debug("sending close token (OP_CLOSE)")
         self.write_frame(OP_CLOSE, buf)
         self._close()
 

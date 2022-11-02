@@ -1,3 +1,9 @@
+# Micropython socketio V4 for esp32
+
+An initial port from https://github.com/danni/uwebsockets
+to get socketio V4 on an esp32.
+Tested with Flask-SocketIO. 
+
 # Micropython websockets (esp8266 implementation)
 
 An implementation of websockets for the ESP8266 (client only ATM). This is a

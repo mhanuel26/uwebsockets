@@ -1,19 +1,26 @@
 import logging
-
 import usocketio.client
 
 logging.basicConfig(level=logging.DEBUG)
 
-def hello():
-    with usocketio.client.connect('http://127.0.0.1:5000/') as socketio:
-        @socketio.on('message')
-        def on_message(self, message):
-            print("message", message)
+def main():
+    # Add code here to join your Local Network
+    socketio = usocketio.client.connect('http://YOURLOCALNETWORKIPHERE:SERVERPORT/')
 
-        @socketio.on('alert')
-        def on_alert(self, message):
-            print("alert", message)
+    @socketio.on('message')
+    def on_message(self, message):
+        print("message", message)
 
-        socketio.run_forever()
+    @socketio.on('alert')
+    def on_alert(self, message):
+        print("alert", message)
 
-hello()
+    while True:
+        try:
+            socketio.run()
+        except KeyboardInterrupt:
+            socketio.close()
+            break
+
+if __name__ == "__main__":
+    main()

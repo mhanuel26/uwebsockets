@@ -7,6 +7,7 @@ import usocket as socket
 import uwebsockets.client
 from .protocol import *
 
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -20,11 +21,6 @@ class SocketIO:
 
         # Event handlers map from event -> [handlers, ...]
         self._event_handlers = {}
-        # Interval handlers [(interval, handler), ...]
-        self._interval_handlers = []
-
-        # Register a ping event
-        self.at_interval(params['pingInterval'] // 1000)(self.ping)
 
     def __enter__(self):
         return self
@@ -41,6 +37,16 @@ class SocketIO:
     def emit(self, event, data):
         self._send_message(MESSAGE_EVENT, (event, data))
 
+    def socket_connection(self, data):
+        if __debug__:
+            LOGGER.debug("Sending Socket Connect Event")
+        self._handle_event('connection', data)
+
+    def run(self):
+        if self.websocket.open:
+            packet_type, data = self._recv()
+            self._handle_packet(packet_type, data)
+
     def run_forever(self):
         """Main loop for SocketIO."""
         if __debug__:
@@ -53,16 +59,13 @@ class SocketIO:
 
         while self.websocket.open or self.reconnect:
             if not self.websocket.open:
-                LOGGER.info("Reconnecting")
+                if __debug__:
+                    LOGGER.info("Reconnecting")
                 self.websocket = uwebsockets.client.connect(self.uri)
 
             packet_type, data = self._recv()
             self._handle_packet(packet_type, data)
             counter += 1
-
-            for interval, func in self._interval_handlers:
-                if counter % interval == 0:
-                    func()
 
         if __debug__:
             LOGGER.debug("Exiting event loop")
@@ -76,21 +79,25 @@ class SocketIO:
             self._handle_message(message_type, data)
 
         elif packet_type == PACKET_CLOSE:
-            LOGGER.info("Socket.io closed")
+            if __debug__:
+                LOGGER.info("Socket.io closed")
             self.close()
 
         elif packet_type == PACKET_PING:
-            LOGGER.debug("< ping")
+            if __debug__:
+                LOGGER.debug("< ping")
             self._send_packet(PACKET_PONG, data)
 
         elif packet_type == PACKET_PONG:
-            LOGGER.debug("< pong")
+            if __debug__:
+                LOGGER.debug("< pong")
 
         elif packet_type == PACKET_NOOP:
             pass
 
         else:
-            LOGGER.warning("Unhandled packet %s: %s", packet_type, data)
+            if __debug__:
+                LOGGER.warning("Unhandled packet %s: %s", packet_type, data)
 
     def _handle_message(self, message_type, data):
         if message_type == MESSAGE_EVENT:
@@ -98,14 +105,17 @@ class SocketIO:
             self._handle_event(event, data)
 
         elif message_type == MESSAGE_ERROR:
-            LOGGER.error("Error: %s", data)
+            if __debug__:
+                LOGGER.error("Error: %s", data)
 
         elif message_type == MESSAGE_DISCONNECT:
-            LOGGER.info("Disconnected")
+            if __debug__:
+                LOGGER.info("Disconnected")
             self.close()
 
         else:
-            LOGGER.warning("Unhandled message %s: %s", message_type, data)
+            if __debug__:
+                LOGGER.warning("Unhandled message %s: %s", message_type, data)
 
     def _handle_event(self, event, data=None):
         if __debug__:
@@ -134,7 +144,7 @@ class SocketIO:
         """Receive a packet."""
 
         try:
-            self.websocket.settimeout(1)
+            self.websocket.settimeout(None)
             packet = self.websocket.recv()
 
             if packet:
@@ -156,17 +166,5 @@ class SocketIO:
                 LOGGER.debug("Registered %s to handle %s", func, event)
 
             self._event_handlers.setdefault(event, []).append(func)
-
-        return inner
-
-    def at_interval(self, interval):
-        """Register an event handler to happen at an interval."""
-
-        def inner(func):
-            if __debug__:
-                LOGGER.debug("Registered %s to run at interval %s",
-                             func, interval)
-
-            self._interval_handlers.append((interval, func))
 
         return inner
